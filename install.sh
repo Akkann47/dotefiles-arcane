@@ -3,7 +3,7 @@
 #  Dotfiles Install Script — Hyprland / Arch Linux
 #  À lancer après une archinstall avec Hyprland de base.
 # ============================================================
-set -Ee
+set -E
 
 # --- Couleurs ---
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -184,12 +184,17 @@ install_gtk_theme() {
     fi
     info "Téléchargement du thème Tokyonight-Dark..."
     mkdir -p "$HOME/.themes"
-    local tmpdir
+    local tmpdir theme_src
     tmpdir=$(mktemp -d)
     git clone --depth=1 https://github.com/Fausto-Korpsvart/Tokyonight-GTK-Theme.git "$tmpdir/theme"
-    cp -r "$tmpdir/theme/themes/Tokyonight-Dark" "$HOME/.themes/"
+    theme_src=$(find "$tmpdir/theme" -maxdepth 3 -type d -name "Tokyonight-Dark*" | sort | head -1)
+    if [[ -z "$theme_src" ]]; then
+        rm -rf "$tmpdir"
+        error "Aucun dossier Tokyonight-Dark* trouvé dans le dépôt cloné"
+    fi
+    cp -r "$theme_src" "$HOME/.themes/Tokyonight-Dark"
     rm -rf "$tmpdir"
-    success "Thème Tokyonight-Dark installé"
+    success "Thème Tokyonight-Dark installé (source : $(basename "$theme_src"))"
 }
 
 # ============================================================
