@@ -1,0 +1,3 @@
+[providers.sets.favoris]
+default = ["menus:favoris"]
+empty = ["menus:favoris"]

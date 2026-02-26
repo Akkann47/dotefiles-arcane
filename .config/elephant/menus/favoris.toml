@@ -1,0 +1,44 @@
+name = "favoris"
+name_pretty = "Favoris"
+icon = "applications-other"
+action = "%VALUE%"
+
+[[entries]]
+text = "Firefox"
+value = "firefox"
+icon = "firefox"
+
+[[entries]]
+text = "Kitty"
+value = "kitty"
+icon = "kitty"
+
+[[entries]]
+text = "VSCodium"
+value = "codium"
+icon = "vscodium"
+
+[[entries]]
+text = "Discord"
+value = "discord"
+icon = "discord"
+
+[[entries]]
+text = "Spotify"
+value = "spotify-launcher"
+icon = "spotify"
+
+[[entries]]
+text = "Thunar"
+value = "thunar"
+icon = "thunar"
+
+[[entries]]
+text = "OBS"
+value = "obs"
+icon = "obs"
+
+[[entries]]
+text = "Virt-Manager"
+value = "virt-manager"
+icon = "virt-manager"
