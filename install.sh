@@ -3,7 +3,7 @@
 #  Dotfiles Install Script — Hyprland / Arch Linux
 #  À lancer après une archinstall avec Hyprland de base.
 # ============================================================
-set -e
+set -Ee
 
 # --- Couleurs ---
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -11,6 +11,43 @@ info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
+
+# --- Collecte des erreurs pour le rapport final ---
+ERRORS=()
+
+# --- Gestionnaire d'erreurs interactif ---
+_on_error() {
+    local line=$1 cmd=$2
+    ERRORS+=("ligne $line : $cmd")
+    echo ""
+    echo -e "${RED}[ERR]${NC} Échec ligne $line : ${YELLOW}$cmd${NC}"
+    echo -n "  → Continuer malgré l'erreur ? [o/N] "
+    read -r choice
+    if [[ ! "$choice" =~ ^[oO] ]]; then
+        _print_report
+        echo -e "${RED}Installation annulée.${NC}"
+        exit 1
+    fi
+    echo ""
+}
+trap '_on_error $LINENO "$BASH_COMMAND"' ERR
+
+# --- Rapport final ---
+_print_report() {
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║          RAPPORT D'INSTALLATION          ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
+    if [[ ${#ERRORS[@]} -eq 0 ]]; then
+        echo -e "  ${GREEN}✓ Aucune erreur${NC}"
+    else
+        echo -e "  ${RED}${#ERRORS[@]} erreur(s) rencontrée(s) :${NC}"
+        for err in "${ERRORS[@]}"; do
+            echo -e "  ${RED}✗${NC} $err"
+        done
+    fi
+    echo ""
+}
 
 # --- Vérifications initiales ---
 [[ $EUID -eq 0 ]] && error "Ne pas lancer en root. Lance le script en tant qu'utilisateur normal."
@@ -40,69 +77,66 @@ install_yay() {
 # ============================================================
 install_pacman_packages() {
     info "Installation des paquets officiels..."
+    info "(--needed ignore les paquets déjà installés par archinstall)"
 
     local pkgs=(
-        # Hyprland ecosystem
-        hyprland hyprlock hyprpaper
+        # --- Fournis par archinstall+Hyprland (--needed les saute s'ils sont là) ---
+        hyprland kitty
+        pipewire pipewire-pulse pipewire-alsa wireplumber
+        xdg-desktop-portal-hyprland
+        qt5-wayland qt6-wayland
+        polkit
+        networkmanager
+        xorg-xwayland
 
-        # Screenshots (requis par hyprshot)
+        # --- Hyprland extras ---
+        hyprlock hyprpaper
+
+        # --- Barre / notifications ---
+        waybar swaync
+
+        # --- Screenshots ---
         grim slurp
 
-        # Barre / notifications
-        waybar dunst
-
-        # Terminal
-        kitty
-
-        # Fichiers
+        # --- Fichiers ---
         thunar gvfs gvfs-mtp thunar-volman
 
-        # Apparence
-        nwg-look
-        gtk3 gtk4
-        qt5-wayland qt6-wayland
+        # --- Apparence ---
+        nwg-look gtk3 gtk4
+        polkit-gnome
 
-        # Polkit agent
-        polkit polkit-gnome
-
-        # Virtualisation
+        # --- Virtualisation ---
         virt-manager qemu-full libvirt
         edk2-ovmf dnsmasq bridge-utils iptables-nft swtpm
 
-        # Bluetooth
+        # --- Bluetooth ---
         bluez bluez-utils blueman
 
-        # Audio
-        pipewire pipewire-pulse pipewire-alsa wireplumber
+        # --- Audio ---
         pavucontrol
 
-        # Réseau
-        networkmanager network-manager-applet nm-connection-editor
+        # --- Réseau ---
+        network-manager-applet nm-connection-editor
 
-        # Outils système
-        brightnessctl playerctl
-        fzf jq
-        reflector
+        # --- Outils système ---
+        brightnessctl playerctl ddcutil
+        fzf jq reflector
 
-        # Clipboard
+        # --- Clipboard ---
         wl-clipboard
 
-        # Fonts
+        # --- Portals ---
+        xdg-desktop-portal-gtk
+
+        # --- Fonts ---
         ttf-jetbrains-mono-nerd
         noto-fonts noto-fonts-emoji
 
-        # Portals Wayland
-        xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
-
-        # Python (scripts waybar)
-        python python-requests
-
-        # Xwayland (compatibilité apps X11)
-        xorg-xwayland
-
+        # --- Python (scripts waybar) ---
+        python
     )
 
-    sudo pacman -S --needed --noconfirm "${pkgs[@]}"
+    sudo pacman -S --needed --noconfirm "${pkgs[@]}" || warn "Certains paquets pacman ont échoué, on continue..."
     success "Paquets officiels installés"
 }
 
@@ -113,7 +147,7 @@ install_aur_packages() {
     info "Installation des paquets AUR..."
 
     local aur_pkgs=(
-        # Lanceur
+        # Lanceurs
         walker-bin
         elephant
 
@@ -123,20 +157,20 @@ install_aur_packages() {
         # Éditeur
         vscodium-bin
 
+        # Clipboard history (requis par waybar clipboard.sh)
+        wl-clipboard-history
+
         # Fonts
         ttf-arcadeclassic
 
         # Icons
         numix-circle-icon-theme-git
 
-        # Python (script météo waybar)
-        python-pyquery
-
         # Divers
         psensor
     )
 
-    yay -S --needed --noconfirm "${aur_pkgs[@]}"
+    yay -S --needed --noconfirm "${aur_pkgs[@]}" || warn "Certains paquets AUR ont échoué, on continue..."
     success "Paquets AUR installés"
 }
 
@@ -231,9 +265,9 @@ enable_services() {
     info "Activation des services..."
 
     sudo systemctl enable --now bluetooth.service
-    sudo systemctl enable --now libvirtd.service
-    sudo systemctl enable --now virtlogd.service
     sudo systemctl enable --now NetworkManager.service
+    sudo systemctl enable --now libvirtd.service  || true
+    sudo systemctl enable --now virtlogd.service  || true
 
     success "Services activés"
 }
@@ -301,6 +335,8 @@ enable_services
 setup_user_groups
 setup_libvirt_network
 apply_gtk_settings
+
+_print_report
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
