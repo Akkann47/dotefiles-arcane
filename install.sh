@@ -100,10 +100,11 @@ install_pacman_packages() {
 
         # --- Fichiers ---
         thunar gvfs gvfs-mtp thunar-volman
+        thunar-archive-plugin
 
         # --- Apparence ---
         nwg-look gtk3 gtk4
-        polkit-gnome
+        polkit-gnome sassc
 
         # --- Virtualisation ---
         virt-manager qemu-full libvirt
@@ -113,7 +114,7 @@ install_pacman_packages() {
         bluez bluez-utils blueman
 
         # --- Audio ---
-        pavucontrol
+        pavucontrol alsa-utils
 
         # --- Réseau ---
         network-manager-applet nm-connection-editor
@@ -129,8 +130,11 @@ install_pacman_packages() {
         xdg-desktop-portal-gtk
 
         # --- Fonts ---
-        ttf-jetbrains-mono-nerd
+        ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols
         noto-fonts noto-fonts-emoji
+
+        # --- Applications ---
+        firefox obs-studio discord spotify-launcher
 
         # --- Python (scripts waybar) ---
         python
@@ -158,7 +162,10 @@ install_aur_packages() {
         vscodium-bin
 
         # Clipboard history (requis par waybar clipboard.sh)
-        wl-clipboard-history
+        wl-clipboard-history-git
+
+        # Waybar modules
+        waybar-module-pacman-updates-git
 
         # Fonts
         ttf-arcadeclassic
@@ -260,6 +267,10 @@ deploy_dotfiles() {
     # Wallpaper
     cp -f "$DOTFILES_DIR/wallpapers/Ekko_Powder.jpg" "$HOME/Images/Wallpapers/"
 
+    # SDDM config (nécessite sudo — copié dans /etc/sddm.conf.d/)
+    sudo mkdir -p /etc/sddm.conf.d
+    sudo cp -f "$DOTFILES_DIR/etc/sddm.conf.d/10-hyprland.conf" /etc/sddm.conf.d/
+
     success "Dotfiles déployés"
 }
 
@@ -271,8 +282,11 @@ enable_services() {
 
     sudo systemctl enable --now bluetooth.service
     sudo systemctl enable --now NetworkManager.service
-    sudo systemctl enable --now libvirtd.service  || true
-    sudo systemctl enable --now virtlogd.service  || true
+    # SDDM : archinstall le fournit généralement, mais certains setups utilisent greetd
+    sudo systemctl enable sddm 2>/dev/null || true
+    # Services libvirt : optionnels, peuvent être absents dans une VM guest
+    sudo systemctl enable --now libvirtd.service 2>/dev/null || true
+    sudo systemctl enable --now virtlogd.service 2>/dev/null || true
 
     success "Services activés"
 }
@@ -284,8 +298,9 @@ setup_user_groups() {
     info "Ajout de l'utilisateur aux groupes nécessaires..."
     local user
     user=$(whoami)
-    sudo usermod -aG libvirt "$user"
-    sudo usermod -aG kvm "$user"
+    # libvirt/kvm : groupes absents dans une VM guest — ignorés silencieusement
+    sudo usermod -aG libvirt "$user" 2>/dev/null || true
+    sudo usermod -aG kvm     "$user" 2>/dev/null || true
     sudo usermod -aG video "$user"
     sudo usermod -aG input "$user"
     warn "Groupes mis à jour — un redémarrage est nécessaire pour qu'ils soient actifs"
@@ -311,6 +326,19 @@ setup_libvirt_network() {
 # ============================================================
 apply_gtk_settings() {
     info "Application des paramètres GTK..."
+
+    # Fichiers settings.ini (persistent même sans session dbus active)
+    mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
+    for dir in "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"; do
+        cat > "$dir/settings.ini" << 'EOF'
+[Settings]
+gtk-theme-name=Tokyonight-Dark
+gtk-icon-theme-name=Numix-Circle
+gtk-cursor-theme-size=24
+gtk-application-prefer-dark-theme=1
+EOF
+    done
+
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface gtk-theme "Tokyonight-Dark" 2>/dev/null || true
         gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
